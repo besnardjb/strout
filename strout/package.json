@@ -1,0 +1,21 @@
+{
+  "name": "strout",
+  "version": "0.0.1",
+  "description": "A structured output wrapper for the standard output",
+  "main": "main.js",
+  "dependencies": {
+    "canvas": "^1.6.5",
+    "marked": "^0.3.6"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "MPI",
+    "Structured",
+    "output"
+  ],
+  "author": "Jean-Baptiste BESNARD",
+  "license": "CECILL-C"
+}
