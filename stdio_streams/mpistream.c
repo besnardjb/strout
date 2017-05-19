@@ -469,6 +469,26 @@ int MPIX_Stream_map( MPI_Stream s , const char * label )
 	return MPI_SUCCESS;
 }
 
+#include <sys/time.h>
+
+static double _getts()
+{
+	struct timeval tv;
+	gettimeofday( &tv, NULL );
+
+	return (double)tv.tv_sec + (double)tv.tv_usec * 1e-6;
+}
+
+
+static double getts()
+{
+	static double ref = 0.0;
+	if( ref == 0.0 )
+		ref = _getts();
+
+	return _getts() - ref;
+}
+
 
 int MPIX_Stream_printf( MPI_Stream s , const char * format , ... )
 {
@@ -495,6 +515,22 @@ int MPIX_Stream_printf( MPI_Stream s , const char * format , ... )
 		}
 	}
 
+	char static_fbuff[4096];
+
+	char *fbuff = static_fbuff;
+
+	if( 4096 < st->block_size )
+	{
+		fbuff = malloc( st->block_size + 1 );
+		if( !fbuff )
+		{
+			perror("malloc");
+			abort();
+		}
+	}
+
+
+
 
 	va_list args;
     
@@ -507,13 +543,15 @@ int MPIX_Stream_printf( MPI_Stream s , const char * format , ... )
     
 	va_end(args);
 
+	snprintf(fbuff, st->block_size, ":%g:%s", getts(), buff );
 	
-	MPIX_Stream_write( s, buff, len + 1);
+	MPIX_Stream_write( s, fbuff, strlen(fbuff) );
 
 
 	if( 4096 < st->block_size )
 	{
 		free(buff);
+		free(fbuff);
 	}
 
 	return MPI_SUCCESS;
