@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 var log = require("./factory");
 
 var readline = require('readline');

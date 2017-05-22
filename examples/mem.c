@@ -1,13 +1,16 @@
 #include <mpi.h>
 #include <math.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <string.h>
-#include "mpistream.h"
 #include <sys/resource.h>
 #include <stdio.h>
 #include <sys/sysinfo.h>
 #include <sys/time.h>
+
+
+#include "mpistream.h"
 
 double _getts()
 {
@@ -57,20 +60,70 @@ void memstream_release() {
 	MPIX_Stream_release( &mem_s );
 }
 
+
+struct statm_t{
+	unsigned long size;
+	unsigned long resident;
+	unsigned long share;
+	unsigned long text;
+	unsigned long lib;
+	unsigned long data;
+	unsigned long dt;
+};
+
+void read_off_memory_status(struct statm_t * result)
+{
+  unsigned long dummy;
+  const char* statm_path = "/proc/self/statm";
+
+  FILE *f = fopen(statm_path,"r");
+  if(!f){
+    perror(statm_path);
+    abort();
+  }
+  if(7 != fscanf(f,"%ld %ld %ld %ld %ld %ld %ld", 
+		   &result->size,
+                   &result->resident,
+		   &result->share,
+                   &result->text,
+                   &result->lib,
+                   &result->data,
+                   &result->dt) )
+		  {
+		    perror(statm_path);
+		    abort();
+		  }
+  fclose(f);
+  
+  /* Multiply by page size */
+  int page_size = sysconf(_SC_PAGESIZE);
+  
+  result->size *= page_size;
+  result->resident *= page_size;
+  result->share *= page_size;
+  result->text *= page_size;
+  result->lib *= page_size;
+  result->data *= page_size;
+  result->dt *= page_size;
+  
+}
+
 static double getmem()
 {
-	struct sysinfo si;
- 	sysinfo (&si);
+	struct statm_t mem= {};
+	read_off_memory_status( & mem );
 
-	return si.freeram / (1024.0 * 1024.0);
+	return mem.resident / (1024.0 * 1024.0);
 }
 
 
 void memstream_log()
 {
-	double mem = getmem();
+	double lmem = getmem();
+	double mem = 0;
 	double now = getts();
 
+	MPI_Reduce( &lmem , &mem , 1 , MPI_DOUBLE , MPI_SUM , 0 , MPI_COMM_WORLD );
 
 	if( !rank )
 	{
@@ -95,16 +148,15 @@ int main( int argc, char *argv[])
 
 	int i;
 
-	for (i = 0; i < 1024; ++i) {
+	for (i = 0; i < 8192; ++i) {
 		
-		double s =  fabs( 5* 1024 * 1024.0 * 1024.0 * sin(i/64.0) );
+		double s =  fabs( 5 * 1024 * 1024.0 * 1024.0 * sin(i/64.0) );
 		void * data = malloc( s );
 
 		memset( data , 0 , s );
 
 		memstream_log();
 
-	fprintf(stderr, "%d\n", i);
 		free( data );
 
 		usleep(500);

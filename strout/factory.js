@@ -81,6 +81,7 @@ var Factory = function ()
 
 			if( etar == undefined )
 			{
+				console.log("==> " + line );
 				throw new Error("No such object " + target );
 				return;
 			}

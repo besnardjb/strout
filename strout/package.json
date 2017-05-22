@@ -16,6 +16,9 @@
     "Structured",
     "output"
   ],
+  "bin": {
+   "strout": "./main.js"
+  },
   "author": "Jean-Baptiste BESNARD",
   "license": "CECILL-C"
 }

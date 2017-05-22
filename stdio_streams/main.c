@@ -5,7 +5,7 @@
 int main( int argc, char *argv[])
 {
 	int l;
-	MPI_Init_thread(&argc, &argv, MPI_THREAD_SERIALIZED, &l);
+	MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &l);
 
 	MPI_Stream s;
 	

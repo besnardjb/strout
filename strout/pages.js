@@ -44,7 +44,23 @@ var PageManager = function(path)
 {
 	/* Members */
 	this.pages = {};
-	this.path = process.cwd() + "/report/"
+
+	var dir = process.env["STROUT_DIR"];
+
+	if( dir == undefined )
+	{
+		dir = process.cwd() + "/report/";
+	}
+	
+	if (fs.existsSync(dir)) {
+		console.log("Warning " + dir + " directory is already present, you may delete it or use STROUT_DIR to set it.");
+		process.exit(1);
+	}
+	else
+	{
+		this.path = process.cwd() + "/report/"
+	}
+
 	this.resid = 0;
 
 	/* Methods */

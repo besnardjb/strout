@@ -180,6 +180,7 @@ struct iMPI_Stream * iMPI_Stream_new(  MPI_Comm comm, char * label , MPI_Count b
 
 int iMPI_Stream_release( struct iMPI_Stream * s )
 {
+	MPI_Barrier(s->comm);
 
 	if( s->running )
 	{
@@ -310,11 +311,11 @@ int MPIX_Stream_write( MPI_Stream s , void * data, MPI_Count size )
 	MPI_Comm_rank( st->comm , &rank );
 	MPI_Comm_size( st->comm , &csize );
 
-	if( (csize == 1) || (rank == st->root ))
+	if( (csize == 1) || ( st->is_root ))
 	{
 		pthread_mutex_lock( &st->lock );
 		fwrite( data, sizeof(char), size, st->fd);
-		//fflush( st->fd );
+		fflush( st->fd );
 		pthread_mutex_unlock( &st->lock );
 		return MPI_SUCCESS;
 	}
@@ -357,21 +358,20 @@ void * stream_reader( void * ps )
 	while( run )
 	{
 		MPI_Status sta;
-		MPI_Recv( buffer , st->block_size , MPI_CHAR , MPI_ANY_SOURCE , 123 , st->comm , &sta );
+		MPI_Message m;
+		MPI_Mprobe( MPI_ANY_SOURCE, 123, st->comm, &m, &sta);
 		
-		int size;
-		MPI_Get_count(&sta, MPI_CHAR, &size);
+		int size = 0;
+		MPI_Get_count( &sta, MPI_CHAR, &size);
 
+		if( (size == MPI_UNDEFINED) || (size == 0) )
+			continue;
 
-		buffer[size + 1 ] = '\0';
+		MPI_Mrecv( buffer, size , MPI_CHAR, &m, &sta);
+
+		buffer[size ] = '\0';
 	
-		if( buffer[0] == '-' 
-		&&  buffer[1] == '-'
-		&&  buffer[2] == 'S'
-		&&  buffer[3] ==  'T'
-		&&  buffer[4] ==  'O'
-		&&  buffer[5] ==  'P'
-		)
+		if( strstr(buffer, "--STOP")) 
 		{
 			run = 0;
 		}
@@ -420,7 +420,7 @@ int MPIX_Stream_map( MPI_Stream s , const char * label )
 
 	if( !rank )
 	{
-		st->root = rand()%size;
+		st->root = 0;
 	}
 
 	MPI_Bcast( &st->root , 1 , MPI_INT , 0 , st->comm );
@@ -484,11 +484,12 @@ static double getts()
 {
 	static double ref = 0.0;
 	if( ref == 0.0 )
-		ref = _getts();
+		ref = _getts() - 0.0001;
 
 	return _getts() - ref;
 }
 
+static pthread_mutex_t  printlock = PTHREAD_MUTEX_INITIALIZER;
 
 int MPIX_Stream_printf( MPI_Stream s , const char * format , ... )
 {
@@ -499,7 +500,7 @@ int MPIX_Stream_printf( MPI_Stream s , const char * format , ... )
 		return MPI_ERR_ARG;
 	}
 
-
+	pthread_mutex_lock( &printlock );
 
 	char static_buff[4096];
 
@@ -529,8 +530,8 @@ int MPIX_Stream_printf( MPI_Stream s , const char * format , ... )
 		}
 	}
 
-
-
+	buff[0] = '\0';
+	fbuff[0] = '\0';
 
 	va_list args;
     
@@ -538,14 +539,14 @@ int MPIX_Stream_printf( MPI_Stream s , const char * format , ... )
    
 	vsnprintf( buff, st->block_size,  format, args);
 	int len = strlen(buff);
-	buff[len] = '\n';
-	buff[len + 1] = '\0';
+	buff[len] = '\0';
     
-	va_end(args);
 
-	snprintf(fbuff, st->block_size, ":%g:%s", getts(), buff );
+	snprintf(fbuff, st->block_size, ":%g:%s\n", getts(), buff );
 	
-	MPIX_Stream_write( s, fbuff, strlen(fbuff) );
+	va_end(args);
+	
+	MPIX_Stream_write( s, fbuff, strlen(fbuff)  );
 
 
 	if( 4096 < st->block_size )
@@ -553,6 +554,8 @@ int MPIX_Stream_printf( MPI_Stream s , const char * format , ... )
 		free(buff);
 		free(fbuff);
 	}
+	
+	pthread_mutex_unlock( &printlock );
 
 	return MPI_SUCCESS;
 }
