@@ -73,4 +73,7 @@ There aren't many option for now, by defaut the progam aborts if a report
 directory is already present. Once run you'll find the output in this directory.
 Target directory can be modified with the *STROUT_DIR* environment variable. 
 
+Licence
+=======
 
+This code is CECILL-C a fully LGPL compatible licence.
